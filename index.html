@@ -98,12 +98,8 @@ npm run dev
       </google-codelab-step>
     
       <google-codelab-step label="Create Team Chatbot Slash Commands Zoom Marketplace" duration="0">
-        
-
-      </google-codelab-step>
-    
-      <google-codelab-step label="Add event handler to Team Chatbot for Slash Commands" duration="0">
-        <p>Update file: <code>app/api/zoom/webhook/chatbot/route.ts</code></p>
+        <h2 is-upgraded>Add event handler to Team Chatbot for Slash Commands</h2>
+<p>Update file: <code>app/api/zoom/webhook/chatbot/route.ts</code></p>
 <pre><code language="language-javascript" class="language-javascript">import { NextRequest, NextResponse } from &#34;next/server&#34;;
 
 import crypto from &#34;crypto&#34;;
@@ -116,7 +112,13 @@ const ZOOM_VERIFICATION_TOKEN = process.env.ZOOM_VERIFICATION_TOKEN || &#34;&#34
 
 // Command dispatcher mapping commands to handler functions
 const commandHandlers: Record&lt;string, (payload: any) =&gt; Promise&lt;any&gt;&gt; = {
-  &#34;getrecordings&#34;: handleGetRecordings,
+  &#34;getrecordings&#34;: async (payload: any) =&gt; {
+    const accessToken = process.env.TEMP_ZOOM_ACCESS_TOKEN;
+    if (!accessToken) {
+      return { error: &#34;No Zoom Access Token&#34; };
+    }
+    return handleGetRecordings(accessToken);
+  },
   &#34;aisummary&#34;: async (payload: any) =&gt; {
     const { accessToken, meetingId } = payload;
     return handleAISummary(accessToken, meetingId);
@@ -124,7 +126,6 @@ const commandHandlers: Record&lt;string, (payload: any) =&gt; Promise&lt;any&gt;
   &#34;assignTask&#34;: async (payload: any) =&gt; {
     const command = payload.cmd;
     console.log(&#34;Task Command&#34;, command);
-    //Need to retrieve the token from a persistent storage location or use a service account flow.
     const accessToken = process.env.TEMP_ZOOM_ACCESS_TOKEN;
     console.log(&#34;Access Token Webhook&#34;, accessToken);
     
@@ -133,51 +134,32 @@ const commandHandlers: Record&lt;string, (payload: any) =&gt; Promise&lt;any&gt;
     }
     return handleGetRecordings(accessToken);
   },
-};
+}
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-
-    if (!body) {
-      return NextResponse.json({ error: &#34;No Request Body&#34; }, { status: 400 });
-    }
-
-    // Handle Zoom Webhook URL validation
-    if (body.event === &#34;endpoint.url_validation&#34;) {
-      const hashForValidation = crypto
-        .createHmac(&#34;sha256&#34;, ZOOM_SECRET_TOKEN)
-        .update(body.payload.plainToken)
-        .digest(&#34;hex&#34;);
-
-      return NextResponse.json({
-        plainToken: body.payload.plainToken,
-        encryptedToken: hashForValidation,
-      });
-    }
-
-    // // Verify Authorization Header (Optional but Recommended)
-    const authHeader = req.headers.get(&#34;authorization&#34;) || &#34;&#34;;
-    if (authHeader !== ZOOM_VERIFICATION_TOKEN) {
-      return NextResponse.json({ error: &#34;Unauthorized request&#34; }, { status: 401 });
-    }
-
-    // Process Webhook Events
+ // Process Webhook Events
     if (body.event === &#34;bot_notification&#34;) {
-      console.log(&#34; 🏁 Bot Notification Received&#34;, body.payload);
+      console.log(&#34; 🏁 Bot Notification Received&#34;, body.payload, &#39;\n&#39;);
 
-      // Extract the slash command from the payload
+       // Extract the slash command from the payload
       // (Assuming the slash command is available as body.payload.command)
       const command = body.payload.cmd;
 
       if (command &amp;&amp; commandHandlers[command]) {
-        console.log(&#34; Command Handler&#34;, command);
+        console.log(&#34;Chatbot Command: &#34;, command);
         const result = await commandHandlers[command](body.payload);
+
+        const commandPayload = body.payload;
+        console.log(&#34;Command Payload: &#34;, commandPayload);
+
+        // Log the result of the command handler
+        console.log(&#34;Command Result: &#34;, result);    
+
         return NextResponse.json(result, { status: 200 });
       } else {
         console.warn(&#34;Unknown or missing slash command:&#34;, command);
         return NextResponse.json({ error: &#34;Unknown command&#34; }, { status: 400 });
       }
+
     }
 
     // Process Webhook Events
