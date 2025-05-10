@@ -105,7 +105,9 @@ npm run dev
 import crypto from &#34;crypto&#34;;
 
 // Splash Command Handlers Chatbot Server Actions
-import { handleGetRecordings, handleAISummary } from &#34;@/app/lib/chatbot&#34;;
+import { handleGetRecordings, handleAISummary, sendMessageToZoom } from &#34;@/app/lib/chatbot&#34;;
+import { sendZoomIMMessage } from &#34;@/app/lib/teamchat&#34;;
+
 
 const ZOOM_SECRET_TOKEN = process.env.ZOOM_SECRET_TOKEN || &#34;&#34;;
 const ZOOM_VERIFICATION_TOKEN = process.env.ZOOM_VERIFICATION_TOKEN || &#34;&#34;;
@@ -126,6 +128,7 @@ const commandHandlers: Record&lt;string, (payload: any) =&gt; Promise&lt;any&gt;
   &#34;assignTask&#34;: async (payload: any) =&gt; {
     const command = payload.cmd;
     console.log(&#34;Task Command&#34;, command);
+    //Need to retrieve the token from a persistent storage location or use a service account flow.
     const accessToken = process.env.TEMP_ZOOM_ACCESS_TOKEN;
     console.log(&#34;Access Token Webhook&#34;, accessToken);
     
@@ -134,9 +137,32 @@ const commandHandlers: Record&lt;string, (payload: any) =&gt; Promise&lt;any&gt;
     }
     return handleGetRecordings(accessToken);
   },
-}
+};
 
- // Process Webhook Events
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+
+    if (!body) {
+      return NextResponse.json({ error: &#34;No Request Body&#34; }, { status: 400 });
+    }
+
+    // Handle Zoom Webhook URL validation
+    if (body.event === &#34;endpoint.url_validation&#34;) {
+      const hashForValidation = crypto
+        .createHmac(&#34;sha256&#34;, ZOOM_SECRET_TOKEN)
+        .update(body.payload.plainToken)
+        .digest(&#34;hex&#34;);
+
+      return NextResponse.json({
+        plainToken: body.payload.plainToken,
+        encryptedToken: hashForValidation,
+      });
+    }
+
+   
+
+    // Process Webhook Events
     if (body.event === &#34;bot_notification&#34;) {
       console.log(&#34; 🏁 Bot Notification Received&#34;, body.payload, &#39;\n&#39;);
 
@@ -149,10 +175,10 @@ const commandHandlers: Record&lt;string, (payload: any) =&gt; Promise&lt;any&gt;
         const result = await commandHandlers[command](body.payload);
 
         const commandPayload = body.payload;
-        console.log(&#34;Command Payload: &#34;, commandPayload);
+        console.log(&#34;Command Payload: &#34;, commandPayload, &#39;\n&#39;);
 
         // Log the result of the command handler
-        console.log(&#34;Command Result: &#34;, result);    
+        console.log(&#34;Command Result: &#34;, result, &#39;\n&#39;);    
 
         return NextResponse.json(result, { status: 200 });
       } else {
