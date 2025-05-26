@@ -68,8 +68,9 @@
 
       </google-codelab-step>
     
-      <google-codelab-step label="Project Setup" duration="0">
-        <ol type="1">
+      <google-codelab-step label="Set up the project" duration="0">
+        <p>This codelab provides a starter codebase for the application. Begin by setting up your development environment.</p>
+<ol type="1">
 <li>Clone the project and switch to the correct branch:</li>
 </ol>
 <pre><code language="language-bash" class="language-bash">git clone https://github.com/zoom/task-manager-sample.git
@@ -89,9 +90,9 @@ npm run dev
 
       </google-codelab-step>
     
-      <google-codelab-step label="Zoom Team Chat Slash Commands" duration="0">
+      <google-codelab-step label="Overview: Zoom Team Chat Slash Commands" duration="0">
         <p>In this guide, you&#39;ll learn how to enable Slash commands in your Zoom Team Chat app, allowing users to trigger specific actions or workflows directly from the chat interface.</p>
-<p>By the end of this tutorial, you&#39;ll have:</p>
+<h2 is-upgraded>By the end of this tutorial, you&#39;ll have:</h2>
 <ul>
 <li>A Zoom Team Chat app that supports custom Slash commands</li>
 <li>A backend that listens for command payloads and performs defined actions in response</li>
@@ -104,9 +105,56 @@ npm run dev
 
       </google-codelab-step>
     
-      <google-codelab-step label="Create Team Chatbot Slash Commands Zoom Marketplace" duration="0">
-        <h2 is-upgraded>Add event handler to Team Chatbot for Slash Commands</h2>
-<p>Update file: <code>app/api/zoom/webhook/chatbot/route.ts</code></p>
+      <google-codelab-step label="Add Team Chatbot slash command support" duration="0">
+        <p>In this section, you will add handleGetRecordings and handleAISummary to your Chatbot API and implement support for Zoom Team Chat slash commands. Slash commands allow users to interact with your app directly from Zoom Team Chat.</p>
+<h2 is-upgraded>Step 1: Add slash command functions to the Chatbot server actions file</h2>
+<p><strong>Update file Path: </strong><code>app/lib/chatbot.ts</code></p>
+<pre><code language="language-javascript" class="language-javascript">//Slash Command Chatbot Functions
+/**
+ * Get Recordings for the current user
+ */
+export async function handleGetRecordings(accessToken: string) {
+  const response = await fetch(`${ZOOM_API_BASE_URL}/users/me/recordings`, {
+    method: &#39;GET&#39;,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch recordings: ${response.statusText}`);
+  }
+
+  const recordingsData = await response.json();
+  console.log(&#34;Recordings:&#34;, recordingsData);
+  return recordingsData;
+}
+
+/**
+ * Get AI Summary for a meeting
+ * Note: This API is only available for paid accounts
+ */
+export async function handleAISummary(meetingId: string, accessToken: string) {
+  const response = await fetch(`${ZOOM_API_BASE_URL}/meetings/${meetingId}/meeting_summary`, {
+    method: &#39;GET&#39;,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      &#39;Content-Type&#39;: &#39;application/json&#39;,
+    },
+    // If needed, you can include a body with extra parameters here
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get AI summary: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+
+</code></pre>
+<h2 is-upgraded>Step 2: Add event handler to Team Chatbot for Slash Commands</h2>
+<p><strong>Update file Path: </strong><code>app/api/zoom/webhook/chatbot/route.ts</code></p>
 <pre><code language="language-javascript" class="language-javascript">import { NextRequest, NextResponse } from &#34;next/server&#34;;
 
 import crypto from &#34;crypto&#34;;
